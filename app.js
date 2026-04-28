@@ -1,8 +1,10 @@
 const express = require("express");
 const errorHandler = require("./middleware/error-handler");
 const notFound = require("./middleware/not-found");
+const authMiddleware = require("./middleware/auth");
 
 const userRoutes = require("./routes/userRoutes");
+const taskRoutes = require("./routes/taskRoutes");
 
 global.user_id = null;
 global.users = [];
@@ -21,6 +23,7 @@ const port = process.env.PORT || 3000;
 app.use(express.json({ limit: "1kb" }));
 
 app.use("/api/users", userRoutes);
+app.use("/api/tasks", authMiddleware, taskRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
