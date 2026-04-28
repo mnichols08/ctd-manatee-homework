@@ -10,11 +10,12 @@ exports.register = async (req, res) => {
   // Create new user
   const newUser = { ...req.body };
   global.users.push(newUser);
+  global.user_id = newUser;
 
-  res.status(201).json({
-    name: newUser.name,
-    email: newUser.email,
-  });
+  const responseUser = { ...newUser };
+  delete responseUser.password;
+
+  res.status(201).json(responseUser);
 };
 
 exports.logon = async (req, res) => {
