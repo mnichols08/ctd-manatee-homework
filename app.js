@@ -1,15 +1,37 @@
 const express = require("express");
+const errorHandler = require("./middleware/error-handler");
+const notFound = require("./middleware/not-found");
+const authMiddleware = require("./middleware/auth");
+
+const userRoutes = require("./routes/userRoutes");
+const taskRoutes = require("./routes/taskRoutes");
+
+global.user_id = null;
+global.users = [];
+global.tasks = [];
+
 const app = express();
 
-app.get("/", (req, res) => {
-  res.send("Hello, World! This is the root route.");
+app.use((req, res, next) => {
+  console.log("Method:", req.method);
+  console.log("Path:", req.path);
+  console.log("Query:", req.query);
+  next();
 });
-
-app.post("/testpost", (req, res) => {
-  res.status(200).send("POST received");
-});
-
 const port = process.env.PORT || 3000;
+
+app.use(express.json({ limit: "1kb" }));
+
+app.use("/api/users", userRoutes);
+app.use("/api/tasks", authMiddleware, taskRoutes);
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.use(notFound);
+app.use(errorHandler);
+
 const server = app.listen(port, () =>
   console.log(`Server is listening on port ${port}...`),
 );
@@ -52,4 +74,4 @@ process.on("unhandledRejection", (reason) => {
   shutdown(1);
 });
 
-module.exports = { app, server };
+module.exports = { server, app };
