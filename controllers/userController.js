@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const util = require("util");
 const { StatusCodes } = require("http-status-codes");
 const { userSchema } = require("../validation/userSchema");
+const pool = require("../db/pg-pool");
 
 const scrypt = util.promisify(crypto.scrypt);
 
@@ -18,37 +19,34 @@ async function comparePassword(inputPassword, storedHash) {
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 }
 
-exports.register = async (req, res) => {
+exports.register = async (req, res, next) => {
   if (!req.body) req.body = {};
 
   const { error, value } = userSchema.validate(req.body, { abortEarly: false });
   if (error) {
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ message: error.message });
-  }
-
-  const existingUser = global.users.find((user) => user.email === value.email);
-  if (existingUser) {
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ message: "User already exists" });
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
 
   const hashedPassword = await hashPassword(value.password);
-  const newUser = {
-    name: value.name,
-    email: value.email,
-    hashedPassword,
-  };
 
-  global.users.push(newUser);
-  global.user_id = newUser;
-
-  return res.status(StatusCodes.CREATED).json({
-    name: newUser.name,
-    email: newUser.email,
-  });
+  try {
+    const result = await pool.query(
+      `INSERT INTO users (name, email, hashed_password) VALUES ($1, $2, $3) RETURNING id, name, email`,
+      [value.name, value.email, hashedPassword],
+    );
+    global.user_id = result.rows[0].id;
+    return res.status(StatusCodes.CREATED).json({
+      name: result.rows[0].name,
+      email: result.rows[0].email,
+    });
+  } catch (e) {
+    if (e.code === "23505") {
+      return res
+        .status(StatusCodes.BAD_REQUEST)
+        .json({ message: "User already exists" });
+    }
+    return next(e);
+  }
 };
 
 exports.logon = async (req, res) => {
@@ -61,25 +59,31 @@ exports.logon = async (req, res) => {
       .json({ message: "Email and password are required" });
   }
 
-  const user = global.users.find((u) => u.email === String(email).toLowerCase());
-  if (!user) {
+  const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+    email,
+  ]);
+
+  if (result.rows.length === 0) {
     return res
       .status(StatusCodes.UNAUTHORIZED)
       .json({ message: "Invalid credentials" });
   }
 
-  const isValidPassword = await comparePassword(password, user.hashedPassword);
+  const isValidPassword = await comparePassword(
+    password,
+    result.rows[0].hashed_password,
+  );
   if (!isValidPassword) {
     return res
       .status(StatusCodes.UNAUTHORIZED)
       .json({ message: "Invalid credentials" });
   }
 
-  global.user_id = user;
+  global.user_id = result.rows[0].id;
 
   return res.status(StatusCodes.OK).json({
-    name: user.name,
-    email: user.email,
+    name: result.rows[0].name,
+    email: result.rows[0].email,
   });
 };
 
