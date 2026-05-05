@@ -1,6 +1,15 @@
 const { StatusCodes } = require("http-status-codes");
 
 const errorHandlerMiddleware = (err, req, res, next) => {
+  if (err.code === "ECONNREFUSED" && err.port === 5432) {
+    console.error("Database connection refused:", err.message);
+    if (!res.headersSent) {
+      return res
+        .status(StatusCodes.SERVICE_UNAVAILABLE)
+        .json({ message: "Database connection refused." });
+    }
+  }
+
   console.error(
     "Internal server error: ",
     err.constructor.name,
