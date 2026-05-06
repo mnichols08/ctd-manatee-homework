@@ -74,5 +74,5 @@ SELECT
 FROM employees e
 JOIN orders o ON e.employee_id = o.employee_id
 GROUP BY e.employee_id, first_name, last_name
-HAVING COUNT(order_id) >= 5
+HAVING COUNT(order_id) > 5
 ORDER BY last_name;
