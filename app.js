@@ -27,11 +27,11 @@ app.use("/api/tasks", authMiddleware, taskRoutes);
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
-    res.json({ status: "ok" });
+    res.json({ status: "ok", db: "connected" });
   } catch (err) {
     res
-      .status(503)
-      .json({ status: "error", message: "Database connection failed" });
+      .status(500)
+      .json({ message: `db not connected, error: ${err.message}` });
   }
 });
 
