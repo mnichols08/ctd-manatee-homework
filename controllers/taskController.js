@@ -31,6 +31,7 @@ exports.create = async (req, res) => {
     id: task.id,
     title: task.title,
     is_completed: task.isCompleted,
+    isCompleted: task.isCompleted,
   });
 };
 
