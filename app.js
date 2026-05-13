@@ -2,7 +2,6 @@ const express = require("express");
 const errorHandler = require("./middleware/error-handler");
 const notFound = require("./middleware/not-found");
 const authMiddleware = require("./middleware/auth");
-const pool = require("./db/pg-pool");
 
 const userRoutes = require("./routes/userRoutes");
 const taskRoutes = require("./routes/taskRoutes");
@@ -61,7 +60,6 @@ async function shutdown(code = 0) {
     await prisma.$disconnect();
     console.log("Prisma disconnected");
     console.log("HTTP server closed.");
-    await pool.end();
   } catch (err) {
     console.error("Error during shutdown:", err);
     code = 1;
