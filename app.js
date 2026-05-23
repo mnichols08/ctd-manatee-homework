@@ -5,6 +5,7 @@ const authMiddleware = require("./middleware/auth");
 
 const userRoutes = require("./routes/userRoutes");
 const taskRoutes = require("./routes/taskRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const prisma = require("./db/prisma");
 
@@ -24,6 +25,7 @@ app.use(express.json({ limit: "1kb" }));
 
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", authMiddleware, taskRoutes);
+app.use("/api/analytics", authMiddleware, analyticsRoutes);
 
 app.get('/health', async (req, res) => {
   try {
