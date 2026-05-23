@@ -30,27 +30,66 @@ exports.register = async (req, res, next) => {
   const { name, email } = value;
   const hashedPassword = await hashPassword(value.password);
 
-  let user = null;
   try {
-    user = await prisma.user.create({
-      data: { name, email, hashedPassword },
-      select: { name: true, email: true, id: true },
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { name, email, hashedPassword },
+        select: { id: true, name: true, email: true, createdAt: true },
+      });
+
+      const welcomeTaskData = [
+        {
+          title: "Complete your profile",
+          userId: user.id,
+          priority: "medium",
+        },
+        {
+          title: "Add your first task",
+          userId: user.id,
+          priority: "high",
+        },
+        {
+          title: "Explore the app",
+          userId: user.id,
+          priority: "low",
+        },
+      ];
+
+      await tx.task.createMany({ data: welcomeTaskData });
+
+      const welcomeTasks = await tx.task.findMany({
+        where: {
+          userId: user.id,
+          title: { in: welcomeTaskData.map((task) => task.title) },
+        },
+        select: {
+          id: true,
+          title: true,
+          isCompleted: true,
+          userId: true,
+          priority: true,
+        },
+      });
+
+      return { user, welcomeTasks };
+    });
+
+    global.user_id = result.user.id;
+
+    return res.status(StatusCodes.CREATED).json({
+      user: result.user,
+      welcomeTasks: result.welcomeTasks,
+      transactionStatus: "success",
     });
   } catch (err) {
-    if (err.name === "PrismaClientKnownRequestError" && err.code === "P2002") {
+    if (err.code === "P2002") {
       return res
         .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "User already exists" });
-    } else {
-      return next(err);
+        .json({ error: "Email already registered" });
     }
-  }
 
-  global.user_id = user.id;
-  return res.status(StatusCodes.CREATED).json({
-    name: user.name,
-    email: user.email,
-  });
+    return next(err);
+  }
 };
 
 exports.logon = async (req, res) => {
