@@ -24,7 +24,7 @@ exports.create = async (req, res) => {
       title: value.title,
       isCompleted: value.isCompleted ?? false,
       priority: value.priority ?? "medium",
-      userId: global.user_id,
+      userId: req.user.id,
     },
     select: {
       id: true,
@@ -40,7 +40,6 @@ exports.create = async (req, res) => {
     is_completed: task.isCompleted,
     isCompleted: task.isCompleted,
     priority: task.priority,
-    userId: task.userId,
   });
 };
 
@@ -49,12 +48,13 @@ exports.index = async (req, res) => {
   const limit = Number.parseInt(req.query.limit, 10) || 10;
   if (page < 1 || limit < 1 || limit > 100) {
     return res.status(StatusCodes.BAD_REQUEST).json({
-      error: "Invalid pagination parameters. page must be >= 1 and limit must be 1-100.",
+      error:
+        "Invalid pagination parameters. page must be >= 1 and limit must be 1-100.",
     });
   }
 
   const skip = (page - 1) * limit;
-  const whereClause = { userId: global.user_id };
+  const whereClause = { userId: req.user.id };
 
   if (req.query.find) {
     whereClause.title = {
@@ -115,7 +115,7 @@ exports.show = async (req, res) => {
     where: {
       id_userId: {
         id: taskId,
-        userId: global.user_id,
+        userId: req.user.id,
       },
     },
     select: {
@@ -136,7 +136,9 @@ exports.show = async (req, res) => {
   });
 
   if (!task) {
-    return res.status(StatusCodes.NOT_FOUND).json({ message: "The task was not found." });
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json({ message: "The task was not found." });
   }
 
   return res.status(StatusCodes.OK).json(task);
@@ -165,7 +167,7 @@ exports.update = async (req, res, next) => {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId: req.user.id,
         },
       },
       select: { title: true, isCompleted: true, id: true, priority: true },
@@ -196,7 +198,7 @@ exports.deleteTask = async (req, res, next) => {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId: req.user.id,
         },
       },
       select: { id: true, title: true, isCompleted: true },
@@ -241,7 +243,7 @@ exports.bulkCreate = async (req, res, next) => {
       title: value.title,
       isCompleted: value.isCompleted ?? false,
       priority: value.priority ?? "medium",
-      userId: global.user_id,
+      userId: req.user.id,
     });
   }
 
