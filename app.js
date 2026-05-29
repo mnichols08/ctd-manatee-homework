@@ -1,6 +1,7 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
+const cors = require("cors");
 const { xss } = require("express-xss-sanitizer");
 const rateLimiter = require("express-rate-limit");
 const errorHandler = require("./middleware/error-handler");
@@ -34,6 +35,14 @@ const port = process.env.PORT || 3000;
 app.use(express.json({ limit: "1kb" }));
 app.use(cookieParser());
 app.use(helmet());
+app.use(
+  cors({
+    origin: ["http://localhost:3001"],
+    credentials: true,
+    methods: "GET,POST,PATCH,DELETE",
+    allowedHeaders: "CONTENT-TYPE, X-CSRF-TOKEN",
+  }),
+);
 app.use(xss());
 
 app.use("/api/users", userRoutes);

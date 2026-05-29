@@ -26,20 +26,25 @@ async function comparePassword(inputPassword, storedHash) {
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 }
 
-const cookieFlags = () => {
-  return {
+const cookieFlags = (req) => {
+  const isProd = process.env.NODE_ENV === "production";
+  const flags = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
   };
+  if (isProd && req && req.hostname) {
+    flags.domain = req.hostname;
+  }
+  return flags;
 };
 
-const setJwtCookie = (res, user) => {
+const setJwtCookie = (req, res, user) => {
   const payload = { id: user.id, csrfToken: randomUUID() };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
 
   if (typeof res.cookie === "function") {
-    res.cookie("jwt", token, { ...cookieFlags(), maxAge: 3600000 });
+    res.cookie("jwt", token, { ...cookieFlags(req), maxAge: 3600000 });
   }
 
   return payload.csrfToken;
@@ -99,7 +104,7 @@ exports.register = async (req, res, next) => {
 
       return { user, welcomeTasks };
     });
-    const csrfToken = setJwtCookie(res, result.user);
+    const csrfToken = setJwtCookie(req, res, result.user);
 
     return res.status(StatusCodes.CREATED).json({
       user: result.user,
@@ -153,7 +158,7 @@ exports.logon = async (req, res) => {
       .status(StatusCodes.UNAUTHORIZED)
       .json({ message: "Invalid credentials" });
   }
-  const csrfToken = setJwtCookie(res, user);
+  const csrfToken = setJwtCookie(req, res, user);
 
   return res.status(StatusCodes.OK).json({
     name: user.name,
@@ -163,7 +168,7 @@ exports.logon = async (req, res) => {
 };
 
 exports.logoff = async (req, res) => {
-  const flags = cookieFlags();
+  const flags = cookieFlags(req);
   if (typeof res.clearCookie === "function") {
     res.clearCookie("jwt", flags);
   } else if (typeof res.cookie === "function") {
