@@ -114,7 +114,7 @@ describe("testing logon, register, and logoff", () => {
     });
     const res = MockResponseWithCookies();
     await waitForRouteHandlerCompletion(register, req, res);
-    expect(res.statusCode).not.toBe(201);
+    expect(res.statusCode).toBe(400);
   });
 });
 
