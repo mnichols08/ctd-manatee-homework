@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   create,
+  bulkCreate,
   index,
   show,
   update,
@@ -10,6 +11,7 @@ const {
 const router = express.Router();
 
 router.post("/", create);
+router.post("/bulk", bulkCreate);
 router.get("/", index);
 router.get("/:id", show);
 router.patch("/:id", update);
