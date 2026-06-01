@@ -1,7 +1,12 @@
 const express = require("express");
+const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
+const cors = require("cors");
+const { xss } = require("express-xss-sanitizer");
+const rateLimiter = require("express-rate-limit");
 const errorHandler = require("./middleware/error-handler");
 const notFound = require("./middleware/not-found");
-const authMiddleware = require("./middleware/auth");
+const jwtMiddleware = require("./middleware/jwtMiddleware");
 
 const userRoutes = require("./routes/userRoutes");
 const taskRoutes = require("./routes/taskRoutes");
@@ -9,9 +14,15 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const prisma = require("./db/prisma");
 
-global.user_id = null;
-
 const app = express();
+app.set("trust proxy", 1);
+
+app.use(
+  rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+  }),
+);
 
 app.use((req, res, next) => {
   console.log("Method:", req.method);
@@ -22,17 +33,30 @@ app.use((req, res, next) => {
 const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: "1kb" }));
+app.use(cookieParser());
+app.use(helmet());
+app.use(
+  cors({
+    origin: ["http://localhost:3001"],
+    credentials: true,
+    methods: "GET,POST,PATCH,DELETE",
+    allowedHeaders: "CONTENT-TYPE, X-CSRF-TOKEN",
+  }),
+);
+app.use(xss());
 
 app.use("/api/users", userRoutes);
-app.use("/api/tasks", authMiddleware, taskRoutes);
-app.use("/api/analytics", authMiddleware, analyticsRoutes);
+app.use("/api/tasks", jwtMiddleware, taskRoutes);
+app.use("/api/analytics", jwtMiddleware, analyticsRoutes);
 
-app.get('/health', async (req, res) => {
+app.get("/health", async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', db: 'connected' });
+    res.json({ status: "ok", db: "connected" });
   } catch (err) {
-    res.status(500).json({ status: 'error', db: 'not connected', error: err.message });
+    res
+      .status(500)
+      .json({ status: "error", db: "not connected", error: err.message });
   }
 });
 

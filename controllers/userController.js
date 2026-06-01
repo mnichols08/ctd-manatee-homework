@@ -1,8 +1,15 @@
 const crypto = require("crypto");
 const util = require("util");
+const { randomUUID } = require("crypto");
+const jwt = require("jsonwebtoken");
 const { StatusCodes } = require("http-status-codes");
 const { userSchema } = require("../validation/userSchema");
 const prisma = require("../db/prisma");
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-jwt-secret";
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = JWT_SECRET;
+}
 
 const scrypt = util.promisify(crypto.scrypt);
 
@@ -18,6 +25,30 @@ async function comparePassword(inputPassword, storedHash) {
   const derivedKey = await scrypt(inputPassword, salt, 64);
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 }
+
+const cookieFlags = (req) => {
+  const isProd = process.env.NODE_ENV === "production";
+  const flags = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
+  };
+  if (isProd && req && req.hostname) {
+    flags.domain = req.hostname;
+  }
+  return flags;
+};
+
+const setJwtCookie = (req, res, user) => {
+  const payload = { id: user.id, csrfToken: randomUUID() };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
+
+  if (typeof res.cookie === "function") {
+    res.cookie("jwt", token, { ...cookieFlags(req), maxAge: 3600000 });
+  }
+
+  return payload.csrfToken;
+};
 
 exports.register = async (req, res, next) => {
   if (!req.body) req.body = {};
@@ -73,11 +104,13 @@ exports.register = async (req, res, next) => {
 
       return { user, welcomeTasks };
     });
-
-    global.user_id = result.user.id;
+    const csrfToken = setJwtCookie(req, res, result.user);
 
     return res.status(StatusCodes.CREATED).json({
       user: result.user,
+      name: result.user.name,
+      email: result.user.email,
+      csrfToken,
       welcomeTasks: result.welcomeTasks,
       transactionStatus: "success",
     });
@@ -88,7 +121,13 @@ exports.register = async (req, res, next) => {
         .json({ error: "Email already registered" });
     }
 
-    return next(err);
+    if (typeof next === "function") {
+      return next(err);
+    }
+
+    return res
+      .status(StatusCodes.INTERNAL_SERVER_ERROR)
+      .json({ message: "An internal server error occurred." });
   }
 };
 
@@ -119,16 +158,22 @@ exports.logon = async (req, res) => {
       .status(StatusCodes.UNAUTHORIZED)
       .json({ message: "Invalid credentials" });
   }
-
-  global.user_id = user.id;
+  const csrfToken = setJwtCookie(req, res, user);
 
   return res.status(StatusCodes.OK).json({
     name: user.name,
     email: user.email,
+    csrfToken,
   });
 };
 
 exports.logoff = async (req, res) => {
-  global.user_id = null;
+  const flags = cookieFlags(req);
+  if (typeof res.clearCookie === "function") {
+    res.clearCookie("jwt", flags);
+  } else if (typeof res.cookie === "function") {
+    res.cookie("jwt", "", { ...flags, expires: new Date(0) });
+  }
+
   return res.sendStatus(StatusCodes.OK);
 };
