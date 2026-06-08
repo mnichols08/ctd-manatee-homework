@@ -5,7 +5,7 @@
   "main": "app.js",
   "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "NODE_ENV=test jest --testPathPatterns=test/ --verbose --maxWorkers=1 --detectOpenHandles",
     "tdd": "./tdd.sh",
     "start": "node app.js",
     "week3": "nodemon ./week-3-middleware/app",
@@ -31,8 +31,10 @@
   "devDependencies": {
     "@eslint/js": "^9.24.0",
     "@faker-js/faker": "^10.1.0",
+    "cookie": "^1.1.1",
     "csv-parser": "^3.2.0",
     "eslint": "^9.24.0",
+    "eslint-plugin-jest": "^29.15.2",
     "globals": "^16.0.0",
     "jest": "^30.0.4",
     "node-mocks-http": "^1.17.2",

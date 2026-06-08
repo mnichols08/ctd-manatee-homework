@@ -14,6 +14,7 @@ CREATE TABLE "tasks" (
     "id" SERIAL NOT NULL,
     "title" VARCHAR(255) NOT NULL,
     "is_completed" BOOLEAN NOT NULL DEFAULT false,
+    "priority" VARCHAR(10) NOT NULL DEFAULT 'medium',
     "user_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
