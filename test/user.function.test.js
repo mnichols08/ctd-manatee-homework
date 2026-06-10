@@ -1,5 +1,6 @@
 require("dotenv").config();
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+process.env.RECAPTCHA_BYPASS = process.env.JWT_SECRET;
 const request = require("supertest");
 const prisma = require("../db/prisma");
 let agent;
@@ -26,7 +27,10 @@ describe("register a user", () => {
       email: "jdeere@example.com",
       password: "Pa$$word20",
     };
-    saveRes = await agent.post("/api/users/register").send(newUser);
+    saveRes = await agent
+      .post("/api/users/register")
+      .set("X-Recaptcha-Test", process.env.RECAPTCHA_BYPASS)
+      .send(newUser);
     expect(saveRes.status).toBe(201);
   });
 
