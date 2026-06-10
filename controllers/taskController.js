@@ -87,6 +87,12 @@ exports.index = async (req, res) => {
     where: whereClause,
   });
 
+  if (totalTasks === 0) {
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json({ message: "No tasks were found." });
+  }
+
   const pages = Math.ceil(totalTasks / limit);
   const pagination = {
     page,

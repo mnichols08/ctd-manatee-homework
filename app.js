@@ -32,7 +32,7 @@ app.use((req, res, next) => {
 });
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: "1kb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(helmet());
 app.use(
