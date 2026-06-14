@@ -226,6 +226,87 @@ exports.deleteTask = async (req, res, next) => {
   }
 };
 
+function parseIdsArray(rawIds) {
+  if (!Array.isArray(rawIds) || rawIds.length === 0) {
+    return { error: "Expected a non-empty array of task ids in 'ids'." };
+  }
+
+  if (rawIds.length > 100) {
+    return { error: "A bulk operation is limited to 100 ids." };
+  }
+
+  const ids = [];
+  for (const raw of rawIds) {
+    const id = Number.parseInt(raw, 10);
+    if (Number.isNaN(id) || id <= 0) {
+      return { error: "All ids must be positive integers." };
+    }
+    ids.push(id);
+  }
+
+  return { ids };
+}
+
+exports.bulkUpdate = async (req, res, next) => {
+  const { ids: rawIds, data } = req.body || {};
+
+  const parsed = parseIdsArray(rawIds);
+  if (parsed.error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: parsed.error });
+  }
+
+  const { error, value } = patchTaskSchema.validate(data || {}, {
+    abortEarly: false,
+  });
+  if (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+
+  try {
+    const result = await prisma.task.updateMany({
+      where: {
+        id: { in: parsed.ids },
+        userId: req.user.id,
+      },
+      data: value,
+    });
+
+    return res.status(StatusCodes.OK).json({
+      message: "Bulk task update successful",
+      tasksUpdated: result.count,
+      totalRequested: parsed.ids.length,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.bulkDelete = async (req, res, next) => {
+  const { ids: rawIds } = req.body || {};
+
+  const parsed = parseIdsArray(rawIds);
+  if (parsed.error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: parsed.error });
+  }
+
+  try {
+    const result = await prisma.task.deleteMany({
+      where: {
+        id: { in: parsed.ids },
+        userId: req.user.id,
+      },
+    });
+
+    return res.status(StatusCodes.OK).json({
+      message: "Bulk task deletion successful",
+      tasksDeleted: result.count,
+      totalRequested: parsed.ids.length,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 exports.bulkCreate = async (req, res, next) => {
   const { tasks } = req.body || {};
 
