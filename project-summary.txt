@@ -1,3 +1,98 @@
 Deployed back end (Render.com):
 https://ctd-manatee-homework.onrender.com/
 
+=============================================================
+Assignment 11 — Extra Feature: Bulk Update / Bulk Delete Tasks
+=============================================================
+
+Based on lesson section 11.3.7. The existing task API already exposed
+POST /api/tasks/bulk (bulk create). I extended the bulk surface with two
+new authenticated endpoints that operate on an array of task ids and are
+strictly scoped to the calling user (a user can never touch another
+user's rows, even by sending their ids).
+
+All routes live under /api/tasks and require a valid JWT cookie plus the
+X-CSRF-Token header, same as the existing task routes.
+
+-------------------------------------------------------------
+1) PATCH /api/tasks/bulk     (NEW — bulk update)
+-------------------------------------------------------------
+Updates one or more of the caller's tasks in a single call.
+
+Request body (JSON):
+  {
+    "ids":  [1, 2, 3],            // required, 1..100 positive integers
+    "data": {                      // required, at least one field
+      "title":       "string",     // optional, 3..30 chars
+      "isCompleted": true,         // optional, boolean
+      "priority":    "low" | "medium" | "high"   // optional
+    }
+  }
+
+Responses:
+  200 OK
+    {
+      "message":        "Bulk task update successful",
+      "tasksUpdated":   <number actually updated for THIS user>,
+      "totalRequested": <length of ids[] in the request>
+    }
+  400 Bad Request — ids missing/empty/non-integer/>100, or data fails
+                    patchTaskSchema validation (empty / bad enum / etc.)
+
+Notes:
+  - Implemented with prisma.task.updateMany using
+      where: { id: { in: ids }, userId: req.user.id }
+    so ids belonging to other users are silently ignored. The difference
+    between tasksUpdated and totalRequested tells the caller how many ids
+    were either not theirs or did not exist.
+  - Reuses the existing patchTaskSchema (Joi) used by PATCH /api/tasks/:id,
+    so validation rules stay in one place.
+
+-------------------------------------------------------------
+2) DELETE /api/tasks/bulk    (NEW — bulk delete)
+-------------------------------------------------------------
+Deletes one or more of the caller's tasks in a single call.
+
+Request body (JSON):
+  {
+    "ids": [4, 5, 6]              // required, 1..100 positive integers
+  }
+
+Responses:
+  200 OK
+    {
+      "message":        "Bulk task deletion successful",
+      "tasksDeleted":   <number actually deleted for THIS user>,
+      "totalRequested": <length of ids[] in the request>
+    }
+  400 Bad Request — ids missing/empty/non-integer/>100
+
+Notes:
+  - Implemented with prisma.task.deleteMany scoped by userId, same
+    authorization pattern as the update route.
+
+-------------------------------------------------------------
+Postman test recipe
+-------------------------------------------------------------
+  1. POST /api/users/logon to get the jwt cookie + csrfToken.
+  2. POST /api/tasks several times (or POST /api/tasks/bulk) to seed.
+  3. GET  /api/tasks to grab the new ids.
+  4. PATCH /api/tasks/bulk with body
+        { "ids": [<id1>, <id2>], "data": { "isCompleted": true } }
+     -> 200, tasksUpdated == 2.
+  5. PATCH /api/tasks/bulk again, mixing one of YOUR ids with a fake id
+     like 999999 -> tasksUpdated < totalRequested. Authorization proven.
+  6. DELETE /api/tasks/bulk with body { "ids": [<id1>] } -> 200,
+     tasksDeleted == 1. Confirm with GET /api/tasks.
+
+-------------------------------------------------------------
+Tests
+-------------------------------------------------------------
+Jest tests live in homework/test/taskController.bulk.test.js and cover:
+  - validation failures (missing ids, empty ids, non-integer ids, empty
+    data object)
+  - cross-user authorization (user1 cannot update or delete user2's rows
+    even when supplying their ids)
+  - happy path counts (tasksUpdated / tasksDeleted match expectations)
+
+Run with:  npm test
